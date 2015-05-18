@@ -1,0 +1,2396 @@
+/*
+Name: ConfigApp.h
+
+Type: Main function
+
+Description:
+This is the configuration file for Project2. This file contains the
+environmental parameters for the blackboard.
+
+
+Maintenance
+========== === ========================================================
+2015/03/21 DLH Developed.
+2015/03/28 DLH Add support for DB secondary storage.
+2015/04/03 DLH Support bonus points backdoor
+*/
+
+
+#ifndef CS190_PROJECT2_CONFIGAPP_H_
+#define CS190_PROJECT2_CONFIGAPP_H_
+
+// Define named constants for initialzing static member of the Student class
+#define RELEASE_VERSION "2.5"
+#define RELEASE_CYCLE "beta"
+
+#define MAX_STUDENTS 28
+#define MAX_STUDENT_ID 9999999
+#define COURSE_WEEKS 17
+#define NUM_OF_FINALS 1
+#define WEEK_ASSIGNMENTS 4  // (discussions/quizzes/labs/projects)
+#define STUDENT_ASSIGNMENTS (COURSE_WEEKS*WEEK_ASSIGNMENTS+NUM_OF_FINALS)
+#define MAX_ASSIGNMENTS (MAX_STUDENTS*STUDENT_ASSIGNMENTS)
+#define BONUS_POINTS_LIMIT 0
+//*
+// Define named constants for initializing static members of the Assignment class
+#define MAX_SCORE_DISCUSSIONS 5
+#define MAX_SCORE_QUIZZES 10
+#define MAX_SCORE_LABS 10
+#define MAX_SCORE_PROJECTS 50
+#define MAX_SCORE_FINAL_PROJECT 100
+
+#define IMPLICIT_SAVE 0                         // 1=implicit and 0=explicit
+
+#define DIRECTORY_NAME "database"
+#define STUDENT_FILE_STEM "student_objects"
+#define ASSIGNMENT_FILE_STEM "assignment_objects"
+#define FILE_EXTENSION ".bin"
+#define PATHNAME_SEPERATOR "\\"
+
+#endif /* defined(CS190_PROJECT2_CONFIGAPP_H_) */
+/*
+Name: Student.h
+
+Type: class
+
+Description:
+This class defines vital student information and related functions;
+
+Maintenance
+========== === ========================================================
+2015/03/06 DLH Developed
+2015/03/17 DLH Remove 2-parm get-functions
+2015/03/18 DLH Add MaxStudentId
+2015/03/21 DLH Support object edits and deletes
+2015/03/28 DLH Add support for DB secondary storage.
+2015/03/28 DLH Add instance-modified indicator for secondary storage updates
+2015/04/03 DLH Support bonus points backdoor
+2015/04/05 DLH Overload Student for Assignment totals: += and -= operations.
+2015/04/12 DLH Support Init fucntion for Student class.
+*/
+
+#ifndef CS190_PROJECT2_STUDENT_H_
+#define CS190_PROJECT2_STUDENT_H_
+
+#include <string>
+#include <fstream>
+#include "ConfigApp.h"
+#include "Assignment.h"
+
+using namespace std;
+
+class Student {
+private:
+	int m_nId;
+	int m_nAssignmentCount;
+	double m_dCumScore;
+	double m_dCumMax;
+	double m_dCumBonus;
+	//*
+	string m_sLastName;
+	string m_sFirstName;
+
+	static int m_nNumOfStudents;
+	static int m_nReclaimedStudents;
+	static bool m_bModified;                    // student-objects modified, serialization required
+	//*
+	static const int m_nMaxStudents = MAX_STUDENTS;
+	static const int m_nMaxStudentId = MAX_STUDENT_ID;
+	static const int m_dBonusLimit = BONUS_POINTS_LIMIT;
+
+public:
+	Student();
+	Student(int id, string lastName, string firstName);
+	void Init();
+
+	Student operator+=(Assignment assignment);
+	Student operator-=(Assignment assignment);
+
+	const int GetId() { return m_nId; }
+	string GetLastName() { return m_sLastName; }
+	string GetFirstName() { return m_sFirstName; }
+	double GetCumScore() { return m_dCumScore; }
+	double GetCumMax() { return m_dCumMax; }
+	int GetAssignmentCount() { return m_nAssignmentCount; }
+	double GetBonus() { return m_dCumBonus; }
+	//*
+	static int GetNumOfStudents() { return m_nNumOfStudents; }
+	static int GetMaxStudents() { return m_nMaxStudents; }
+	static int GetMaxStudentId() { return m_nMaxStudentId; }
+	static double GetBonusLimit() { return m_dBonusLimit; }
+	static int GetReclaimed() { return m_nReclaimedStudents; }
+	static bool GetModified() { return m_bModified; }
+
+    // Modify instances vars.
+	void SetId(int nId) { m_nId = nId; m_bModified = true; }
+	void SetLastName(string lastName) { m_sLastName = lastName; m_bModified = true; }
+	void SetFirstName(string firstName) { m_sFirstName = firstName; m_bModified = true; }
+	void SetCount(int nCount) { m_nAssignmentCount = nCount; m_bModified = true; }
+	void SetScore(double dScore) { m_dCumScore = dScore; m_bModified = true; }
+	void SetMax(double dMax) { m_dCumMax = dMax; m_bModified = true; }
+	void SetBonus(double dBonus) { m_dCumBonus = dBonus; m_bModified = true; }
+    //*
+    void SetModified() { m_bModified = true; }
+	void ResetModified() { m_bModified = false; }
+    
+	static void IncrReclaimed() { m_nReclaimedStudents++; }
+	static void DecrReclaimed() { m_nReclaimedStudents--; }
+	void SetNumOfStudents(int nCount) { m_nNumOfStudents = nCount; }
+
+	static int ReserveEntity() {
+		if (m_nNumOfStudents < m_nMaxStudents) {	// Empty slots remaining?
+			m_nNumOfStudents++;
+			return m_nNumOfStudents - 1;
+		}
+		else {									// No, at capacity!
+			return -1;
+		}
+	}
+
+	void Load(fstream& input_FS);				// for object deserialization
+	void Store(fstream& output_FS);				// for object serialization
+
+};
+#endif /* defined(CS190_PROJECT2_STUDENT_H_) */
+/*
+Name: Assignment.h
+
+Type: class
+
+Description:
+This class defines assignement information, information which is cross-linked
+with a Student object by the Id.
+
+Maintenance
+========== === ========================================================
+2015/03/06 MRR Developed
+2015/03/21 DLH Support object edits and deletes
+2015/03/28 DLH Add instance-modified indicator for secondary storage updates
+2015/04/03 DLH Support bonus points backdoor
+2015/04/12 DLH Support Init fucntion for Assignment class.
+*/
+
+#ifndef CS190_PROJECT2_ASSIGNMENT_H_   
+#define CS190_PROJECT2_ASSIGNMENT_H_
+
+#include <string>
+#include <fstream>
+#include "ConfigApp.h"
+
+using namespace std;
+
+class Assignment {
+private:
+	int m_nId;  // Student-Id, the link to the Student-object 
+	int m_nWeek;   // (1 - m_nCourseWeeks)
+	char m_sCode;    // (D/Q/L/P/F)
+	double m_dScorePoints;
+	double m_dMaxPoints;
+	double m_dBonusPoints;
+	
+	static int m_nNumOfAssignments;
+	static int m_nReclaimedAssignments;
+	static bool m_bModified;                    // assignment-objects modified, serialization required.
+	//*
+	static const int m_nMaxAssignments = MAX_ASSIGNMENTS;
+	static const int m_nCourseWeeks = COURSE_WEEKS;
+	static const int m_dMaxScoreDiscussions = MAX_SCORE_DISCUSSIONS;
+	static const int m_dMaxScoreQuizzes = MAX_SCORE_QUIZZES;
+	static const int m_dMaxScoreLabs = MAX_SCORE_LABS;
+	static const int m_dMaxScoreProjects = MAX_SCORE_PROJECTS;
+	static const int m_dMaxScoreFinalProject = MAX_SCORE_FINAL_PROJECT;
+
+public:
+	Assignment();
+	void Init();
+
+
+	int GetId() { return m_nId; }
+	int GetWeek() { return m_nWeek; }
+	char GetCode() { return m_sCode; }
+	double GetScore() { return m_dScorePoints; }
+	double GetMax() { return m_dMaxPoints; }
+	double GetBonus() { return m_dBonusPoints; }
+
+	static int GetNumOfAssignments(){ return m_nNumOfAssignments; }
+	static int GetMaxAssignments(){ return m_nMaxAssignments; }
+	static int GetCourseWeeks(){ return m_nCourseWeeks; }
+	static int GetReclaimed() { return m_nReclaimedAssignments; }
+	static bool GetModified() { return m_bModified; }
+	//*
+	static double GetMaxScoreDiscussions(){ return m_dMaxScoreDiscussions; }
+	static double GetMaxScoreQuizzes(){ return m_dMaxScoreQuizzes; }
+	static double GetMaxScoreLabs(){ return m_dMaxScoreLabs; }
+	static double GetMaxScoreProjects(){ return m_dMaxScoreProjects; }
+	static double GetMaxScoreFinalProject(){ return m_dMaxScoreFinalProject; }
+
+	// Modify instances vars.
+	void SetWeek(int m_nWeek) { this->m_nWeek = m_nWeek; m_bModified = true; }
+	void SetCode(char m_sCode) { this->m_sCode = m_sCode; m_bModified = true; }
+	void SetId(int m_nId) { this->m_nId = m_nId; m_bModified = true; }
+	void SetScorePoints(double m_dScorePoints) {
+        this->m_dScorePoints = m_dScorePoints; m_bModified = true; }
+	void SetMaxPoints(double m_dMaxPoints) { this->m_dMaxPoints = m_dMaxPoints; m_bModified = true; }
+	void SetBonus(double dBonus) { m_dBonusPoints = dBonus; m_bModified = true; }
+    //*
+	void SetModified() { m_bModified = true; }
+	void ResetModified() { m_bModified = false; }
+
+	static void IncrReclaimed() { m_nReclaimedAssignments++; }
+	static void DecrReclaimed() { m_nReclaimedAssignments--; }
+	void SetNumOfAssignments(int nCount) { m_nNumOfAssignments = nCount;}
+
+	static int ReserveEntity() {
+		if (m_nNumOfAssignments < m_nMaxAssignments) {
+			m_nNumOfAssignments++;
+			return m_nNumOfAssignments - 1;
+		}
+		else {
+			return -1;
+		}
+	}
+	
+	void Load(fstream &input_FS);				// for object deserialization
+	void Store(fstream &output_FS);				// for object serialization
+
+};
+
+#endif  /*defined(CS190_PROJECT2_ASSIGNMENT_H_) */
+/*
+Name: Main.cpp
+
+Type: Main function
+
+Description:
+This is the main function for Project2 requested by professor X. The
+program will manage students registered for the course and their concomitant
+assignements.  This particular function is a selector type function, its
+main purpose to setup the environment, query the client,
+requesting the type of processing (students/assignments/reports/end) and
+handling the request, finally breaking down the environment and returning
+control to the the operating system.
+
+
+Maintenance
+========== === ========================================================
+2015/03/06 DLH Developed
+2015/03/17 DLH Purge Student and Assignment arrays prior to exit.
+2015/03/27 DLH Manage console input buffer.
+2015/03/28 DLH Add secondary storage support for repository
+2015/04/03 DLH Support bonus points backdoor
+2015/04/05 DLH Overload Student for Assignment totals: += and -= operations.
+2015/04/11 DLH Remove superfluous specifications info function prototypes
+2015/04/12 DLH Support Init fucntions for Student and Assignment classes.
+*/
+
+// Internalize external files
+#include "Student.h"
+#include "Assignment.h"
+
+#include <Windows.h>							// Beep
+
+#include <iostream>
+#include <string>
+#include <algorithm>
+#include <cctype>
+#include <cassert>
+
+using namespace std;
+
+// Protoypes: Local functions
+void PurgeObjects(Student*&);
+void PurgeObjects(Assignment*&);
+void Help_Main_Level_0();
+string UpperCase(string);
+void null();
+// Protoypes: External functions
+void StudentManager(Student*&, Assignment*&);
+void AssignmentManager(Student*&, Assignment*&);
+void ListManager(Student*&, Assignment*&);
+bool LoadDataBase(Student*&, Assignment*&);
+bool StoreDataBase(Student*&, Assignment*&, bool);
+
+
+// Initialized Student-class static vars
+int Student::m_nNumOfStudents = 0;
+int Student::m_nReclaimedStudents = 0;
+bool Student::m_bModified = false;              // Prevent LNK2001 error
+
+// Initialized Assignment-class static vars  
+int Assignment::m_nNumOfAssignments = 0;
+int Assignment::m_nReclaimedAssignments = 0;
+bool Assignment::m_bModified = false;
+
+
+int main() {
+	cout << "-BlackBoard - " << RELEASE_CYCLE << " version " << RELEASE_VERSION << endl;
+
+	// Allocate and initialize the student object array
+	assert(("Reconfig; parm is too low", MAX_STUDENTS >= 1));
+	Student* course_Students = new Student[MAX_STUDENTS];
+	// Allocate assignement objeect array
+	assert(("Reconfig; parm is too low", MAX_ASSIGNMENTS >= 1));
+	Assignment* course_Assignments = new Assignment[MAX_ASSIGNMENTS];
+    
+	// Load primary database image from secondary-storage
+	if (!(LoadDataBase(course_Students, course_Assignments))) {	// Load failed for database?
+		Beep(523, 500);                     // Get user's attention
+		cout << "-Application terminating due to database load failure.\n";
+		PurgeObjects(course_Assignments);
+		PurgeObjects(course_Students);
+		return 0;
+	}
+	else cout << endl;
+
+	// Process client's actions (add students, add assignments, or list) until termination requested.
+	string sCommand;
+	while (1) {
+		cout << "'Students,' 'assignments,' 'list,' or 'exit'? ";
+		cin >> sCommand;
+		string sCommandEdit = UpperCase(sCommand);
+		if (sCommandEdit == "EXIT" ||
+			sCommandEdit == "END" ||
+			sCommandEdit == "QUIT") {			// Exit requested?	
+			break;
+		}
+		if (sCommandEdit == "STUDENTS" ||
+			sCommandEdit == "STUDENT" ||
+			sCommandEdit == "STU") {			// Student management requested? 
+			StudentManager(course_Students, course_Assignments);
+		}
+		else if (sCommandEdit == "ASSIGNMENTS" ||
+			sCommandEdit == "ASSIGNMENT" ||
+			sCommandEdit == "ASSIGN") {			// Assignment management requested?			
+			AssignmentManager(course_Students, course_Assignments);
+		}
+		else if (sCommandEdit == "LIST" ||
+			sCommandEdit == "LI") {				// List management requested?
+			ListManager(course_Students, course_Assignments);
+		}
+		else if (sCommandEdit == "?") {			// Help requested?
+			Help_Main_Level_0();
+			cin.ignore(INT_MAX, '\n');
+		}
+		else {									// No, request undefined! 
+			cout << "*Request - " << sCommand << " is invalid, try again." << endl;	
+			cin.ignore(INT_MAX, '\n');
+		}
+	
+	}
+
+	// Store primary database image to secondary storage
+	if (IMPLICIT_SAVE == 1) {                   // Save changes without asking?
+		bool bStore = StoreDataBase(course_Students, course_Assignments, false);
+	}
+	else {                                      // No, asked the user for disposition.
+		if (course_Students[-1].GetModified() || course_Assignments[-1].GetModified()) {
+			while (1) {
+				cout << "Save changes (yes/no)? ";	
+				cin.ignore(INT_MAX, '\n');
+				string sRequest;
+				cin >> sRequest;
+				string sRequestEdit = UpperCase(sRequest);
+				if (sRequestEdit == "YES"
+					|| sRequestEdit == "Y") {			// confirmed? 
+					bool bStore = StoreDataBase(course_Students, course_Assignments, false);
+					break;
+				}
+				else if (sRequestEdit == "NO"
+					|| sRequestEdit == "N") {			// rejected? 
+					break;
+				}
+				else if (sRequestEdit == "?") {
+					null();  /*pending*/
+				}
+				else {									// No, request undefined!
+					cout << "Request - " << sRequest << " is invalid, try again.\n";
+				}
+			}
+		}
+	}
+
+    // Purge primary database image
+	PurgeObjects(course_Assignments);
+	PurgeObjects(course_Students);
+
+	cout << "-Processing complete.\n";
+
+	return 0;
+} /* End-of-primary function */
+
+//*
+//*** Main SUBFUNCTION(S) SECTION
+//*
+
+// Local subfunction(s)
+//
+void Help_Main_Level_0() {
+	cout << "-Help:\n";
+	cout << "-Add new student-Ids - type 'students,' 'student,' or 'stu.'\n";
+	cout << "-Record assignment results - type 'assignments,' 'assignment,' or 'assign.'\n";
+	cout << "-List the blackboard status - type 'list' or 'li.'\n";
+	cout << "-Terminate the blackboard - type 'exit,' 'quit,' or 'end.'\n";
+	cout << endl;
+}
+
+
+void PurgeObjects(Student* &students) {
+	delete[] students;
+	students = 0;
+}
+
+
+void PurgeObjects(Assignment* &assignments) {
+	delete[] assignments;
+	assignments = 0;
+}
+
+
+// Global subfunction(s)
+//
+Student::Student() {
+	Student::Init();
+}
+
+void Student::Init() {
+	m_nId = -1;
+	m_nAssignmentCount = 0;
+	m_dCumScore = 0.0;
+	m_dCumMax = 0.0;
+	m_dCumBonus = 0.0;
+	//*
+	m_sLastName = "VOID";
+	m_sFirstName = "VOID";
+}
+
+
+Student::Student(int m_nId, string lastName, string firstName) {
+	Student::Init();
+	m_nId = m_nId;
+	m_sLastName = lastName;
+	m_sFirstName = firstName;
+	//*
+	m_nNumOfStudents++;							//Update object internals
+}
+
+
+Student Student::operator+=(Assignment assignment) {
+	m_dCumScore += assignment.GetScore();
+	m_dCumMax += assignment.GetMax();
+	m_dCumBonus += assignment.GetBonus();
+	m_nAssignmentCount++;
+	m_bModified = true;
+	return Student();    
+}
+
+
+Student Student::operator-=(Assignment assignment) {
+	m_dCumScore -= assignment.GetScore();
+	m_dCumMax -= assignment.GetMax();
+	m_dCumBonus -= assignment.GetBonus();
+	m_nAssignmentCount--;
+	m_bModified = true;
+	return Student();
+}
+
+
+
+Assignment::Assignment() {
+	Assignment::Init();
+}
+
+
+void Assignment::Init() {
+	m_nId = -1;
+	m_nWeek = -1;
+	m_sCode = ' ';
+	m_dScorePoints = 0.0;
+	m_dMaxPoints = 0.0;
+	m_dBonusPoints = 0.0;
+}
+
+
+string UpperCase(string sArgString) {
+	// Convert a string to upper case and return
+	int length = sArgString.length();
+	for (int iii = 0; iii < length; iii++) {
+		char Uchar = toupper(sArgString[iii]);
+		sArgString[iii] = char(Uchar);
+	}
+
+	return sArgString;
+}
+
+
+int ScanForStudentId(Student* &oArgStudents, int nArgId) {
+	// Search for Student-Id within student-object array
+	int nSearchMax = oArgStudents[-1].GetNumOfStudents();
+	for (int iii = 0; iii < nSearchMax; iii++) {
+		if (oArgStudents[iii].GetId() == nArgId) {	// Student-Id found?
+			return iii;  // Student-Id found!
+		}
+	}
+
+	return -1;  // Student-Id not found!
+}
+
+
+bool IsNumeric(const std::string &s) {
+	// Numeric test function for strings:
+	// Source: stackoverflow.com forum, "How to determine if a string is a number with C++?"  
+	// Resources: algorithm-include
+	return !s.empty() && std::all_of(s.begin(), s.end(), ::isdigit);
+}
+
+
+string JustifyRight(int nArgNum, int nArgLen, char cArgFill) {
+	assert(("Justification request out-of- bounds!", nArgLen >= 1 && nArgLen <= 16));
+	char cfill[17];
+	for (int iii = 0; iii < nArgLen; iii++) { cfill[iii] = cArgFill; }
+	cfill[nArgLen] = char(0);
+	string sTemp = string(cfill) + to_string(nArgNum);
+	return sTemp.substr(sTemp.length() - nArgLen, nArgLen);
+}
+
+
+string FormatId(int nId) {
+	// The value, 7, is based on the number-of-digits required for MAX_STUDENT_ID, 9999999.
+	return JustifyRight(nId, 7, '0');
+}
+
+
+void null() {
+	// A Placeholder instruction
+}
+
+
+bool ConfirmDelete() {
+	// ***Warning: Do not clear input buffer before invoking this function.
+	while (1) {
+		cout << "Confirm Delete (yes/no)? ";
+		cin.ignore(INT_MAX, '\n');
+		string sRequest;
+		cin >> sRequest;
+		string sRequestEdit = UpperCase(sRequest);
+		if (sRequestEdit == "YES"
+			|| sRequestEdit == "Y") {			// Cancel confirmed? 
+			return true;
+		}
+		else if (sRequestEdit == "NO"
+			|| sRequestEdit == "N") {			// Cancel rejected? 
+			return false;
+		}
+		else {									// No, request undefined!
+			cout << "*Request - " << sRequest << " is invalid, try again.\n";
+		}
+	}
+
+}
+/*
+Name: Student.cpp
+
+Type: Subfunction
+
+Description:
+This is the student manager function for Project2 requested by professor X.
+Given the Student-object array, add new studdents until client request exit by
+specify a student-id of -1; otherwise, accept only natural numbers, numbers
+greater than 1, assuring that students added do not exceed the maximum allowed.
+
+numOfStudents - Insert next student here then update.
+maxStudents - Maximum number of students permitted, the index is one less than this amount.
+
+
+Maintenance
+========== === ========================================================
+2015/03/13 EE  Developed
+2015/03/14 DLH Standardize messages and minor cleanup
+2015/03/15 DLH Make Convert student add into an atomic-function.
+2015/03/18 DLH Validate Student-Id
+2015/03/27 DLH Add support for edit and delete functions.
+2015/03/27 DLH Manage console input buffer.
+2015/04/05 DLH Overload Student for Assignment totals: += and -= operations.
+2015/04/11 DLH Remove superfluous specifications info function prototypes
+2015/04/12 DLH Support Init fucntions for Student and Assignment classes.
+*/
+
+#include <iostream>
+#include "Assignment.h"
+#include "Student.h"
+#include <cassert>
+
+
+using namespace std;
+
+// Protoypes: Local functions
+bool IsLetters(string);
+void DeleteStudent(Student&, Assignment*&);
+void EditStudent(Student&);
+string GetName(string);
+int ReclaimStudent(Student*&);
+int AddStudent(Student*&, int, string, string);
+bool double_equals(double, double, double=0.001);
+// Protoypes: External functions
+int ScanForStudentId(Student*&, int);
+string UpperCase(string);
+bool IsNumeric(const std::string&);
+string FormatId(int);
+void null();
+bool ConfirmDelete();
+
+
+void StudentManager(Student* &students, Assignment* &assignments) {
+	string sNewId; // String version of ID to test for natural numbers.
+	string sNewFName, sNewLName;
+	int nNewId;
+
+	// Process student requests until end requested
+	while (1) {
+		cout << "Student-Id or end? ";
+		cin >> sNewId;
+		sNewId = UpperCase(sNewId);
+		if (sNewId == "END") break;
+		if (IsNumeric(sNewId) == 0
+			|| (stoi(sNewId) < 1 || stoi(sNewId) > students[-1].GetMaxStudentId())) {
+			cout << "*Student-Id must be from 1 to " << students[-1].GetMaxStudentId() << ".\n";
+			continue;
+		}
+		nNewId = std::stoi(sNewId); // Convert string version of ID to integer.
+		int iDup = ScanForStudentId(students, nNewId);
+		if (iDup != -1) {                   // Student-Id exist?
+			cin.ignore(INT_MAX, '\n');
+			// Edit, Delete, or Cancel 
+			cout << "Student-Id " << FormatId(nNewId)
+				<< " is assigned to " << students[iDup].GetLastName() << ", "
+				<< students[iDup].GetFirstName() << endl;
+			while (1) {
+				string sRequest;
+				cout << "Edit, delete or cancel? ";
+				cin >> sRequest;
+				string sEditRequest = UpperCase(sRequest);
+				if (sEditRequest == "CANCEL"
+					|| sEditRequest == "CAN"
+					|| sEditRequest == "C") {
+					break;
+				}
+				else if (sEditRequest == "DELETE"
+					|| sEditRequest == "DEL"
+					|| sEditRequest == "D") {
+					DeleteStudent(students[iDup], assignments);
+					break;
+				}
+				else if (sEditRequest == "EDIT"
+					|| sEditRequest == "E") {
+					EditStudent(students[iDup]);
+					cin.ignore(INT_MAX, '\n');
+					break;
+				}
+				else if (sEditRequest == "?") {
+					null();  /*pending*/
+				}
+				else {
+					cout << "Request - " << sRequest << " is invalid, try again.\n";
+					cin.ignore(INT_MAX, '\n');
+				}
+			}
+		}
+		else {
+			if (students[-1].GetNumOfStudents() < students[-1].GetMaxStudents()
+				|| students[-1].GetReclaimed() > 0) {
+				string sNewFName = GetName("First");
+				string sNewLName = GetName("Last");
+				int iii = AddStudent(students, nNewId, sNewLName, sNewFName);
+				if (iii != -1) {
+					cout << "-Student-Id " << FormatId(nNewId) << " has been added to respository for "
+						<< students[iii].GetFirstName() << " " << students[iii].GetLastName() << endl;
+				}
+				else {
+					cout << "*Error adding student " << FormatId(nNewId) << "!\n";
+				}
+			}
+			else {
+				cout << "*New students cannot be added, a maximum of "
+					<< students[-1].GetMaxStudents() << " has been reached.\n";
+			}
+			cin.ignore(INT_MAX, '\n');
+		}
+	}
+
+} /* End-of-primary function */
+
+
+int AddStudent(Student* &students, int iId, string sLastName, string sFirstName) {
+	int iii = ReclaimStudent(students);
+	if (iii != -1) {
+		students[iii].SetId(iId);
+		students[iii].SetFirstName(sFirstName);
+		students[iii].SetLastName(sLastName);
+		return iii;
+	}
+	else {
+		return -1;
+	}
+}
+
+
+int ReclaimStudent(Student* &students) {
+	if (students[-1].GetReclaimed() >= 1) {
+		for (int iii = students[-1].GetNumOfStudents() - 1; iii >= 0; iii--) { 
+			if (students[iii].GetId() == -1) {	// Reclaimed slot?
+				students[-1].DecrReclaimed();
+				return iii;
+			}
+		}
+		assert(("Reclaimed slots for Student-objects not found!", 0));  // Reclaim var in error. 
+		return 	-1; // Prevent compiler warning, "C4715." 
+	}
+	else {
+		return students[-1].ReserveEntity();
+	}
+}
+
+
+void DeleteStudent(Student &student, Assignment*  &assignments)  {	
+	if (ConfirmDelete() == false ) { return; }
+	
+	int nAssignmentCount = assignments[-1].GetNumOfAssignments();
+	int nId = student.GetId();
+	int nAssignmentTotal = 0;
+	for (int iii = 0; iii < nAssignmentCount; iii++) {
+		if (assignments[iii].GetId() == nId) {
+			// Decrement student cumulations
+			student -= assignments[iii];
+			// Void assignment record
+			assignments[iii].Init();
+			//*
+			assignments[-1].IncrReclaimed();
+			nAssignmentTotal++;
+		}
+	}
+	// Void Student record
+	assert(("Bad reclaim totals", student.GetAssignmentCount() == 0
+         && double_equals(student.GetCumScore(),0.0)  
+         && double_equals(student.GetCumMax(),0.0) 
+         && double_equals(student.GetBonus(),0.0)));
+	student.Init();
+	//*
+	student.IncrReclaimed();
+
+	cout << "Student-Id " << FormatId(nId) << " and " << nAssignmentTotal << " related assignments deleted.\n";
+}
+
+
+void EditStudent(Student &student) {
+	student.SetFirstName(GetName("First"));
+	student.SetLastName(GetName("Last"));
+}
+
+
+string GetName(string sType) {
+	string sName;
+	while (1) {
+		cout << sType << " name? ";
+		cin >> sName;
+		if (IsLetters(sName)) {
+			break;
+		}
+		else {
+			cout << "*Name can contain only letters and hyphens.\n";
+		}
+	}
+	return sName;
+}
+
+
+bool IsLetters(string name) {
+	int nameLength = (int)name.length();
+	for (int i = 0; i < nameLength; i++) 
+		if (!((name[i] <= 'z' && name[i] >= 'a')
+			|| (name[i] <= 'Z' && name[i] >= 'A')
+			|| (name[i] == '-'))) return false;
+	return true;
+}
+
+
+bool double_equals(double a, double b, double epsilon) {
+	// Numeric test for double equality
+	// Source: stackoverflow.com forum, "c++ comparison of two double values not working properly [duplicate]"
+	return std::abs(a - b) < epsilon;
+}
+/*
+Name: Assignment.cpp
+
+Type: subfunction
+
+Description:
+This is the assignment manager function for Project2 requested by professor X.
+
+PDL:
+Announce Assignment function
+Request week (1 - n) or exit
+Exit on request
+Validate week
+Request assignment type: Discussion, Quiz, Lab, Project, Final, or exit
+Exit on request
+Validate assignment type
+Request Student-Id or exit
+Verify student exist
+Check for existing Assignment
+Request score
+Check amount aginst limit
+
+
+Maintenance
+========== === ========================================================
+2015/03/06 DLH Developed
+2015/03/27 DLH Add support for edit and delete functions.
+2015/03/27 DLH Manage console input buffer.
+2015/04/03 DLH Support bonus points backdoor
+2015/04/05 DLH Overload Student for Assignment totals: += and -= operations.
+2015/04/11 DLH Remove superfluous specifications info function prototypes
+2015/04/12 DLH Support Init fucntions for Student and Assignment classes.
+*/
+
+
+#include <iostream>
+#include "Assignment.h"
+#include "Student.h"
+#include <iomanip>
+#include <cassert>
+
+using namespace std;
+
+// Protoypes: Local functions
+int ScanForAssignment(Assignment*&, int, int, char);
+void AddAssignmentByType(Assignment*&, Student*&, char,
+	string, double, int);
+void Help_Assignment_Level_0();
+int ReclaimAssignment(Assignment*&);
+int AddAssignment(Assignment*&, Student&,
+	int, int, char, double, double, double);
+void DeleteAssignment(Assignment&, Student&);
+void EditAssignment(Assignment&, Student&,
+	string, double, string);
+double GetScore(string, double, double&, Student&);
+// Protoypes: External functions
+string UpperCase(string);  // Lower-to-upper case conversion function
+bool IsNumeric(const std::string&);
+int ScanForStudentId(Student*&, int);  // Student-Id search function
+string JustifyRight(int, int, char);
+string FormatId(int);
+void null();
+bool ConfirmDelete();
+
+
+void AssignmentManager(Student* &students, Assignment* &assignments) {
+	cout << "Managing assignments request\n";
+
+	// Prepare ubiquitous constants
+	const int nMaxAssignments = assignments[-1].GetMaxAssignments();
+	const string sWeekQuery = "Week (1 - " + to_string(assignments[-1].GetCourseWeeks()) + ") or end? ";
+
+	// Process assignment requests until end requested
+	while (1) {
+		cout << sWeekQuery;
+		string sWeek;
+		cin >> sWeek;
+		sWeek = UpperCase(sWeek);
+		if (sWeek == "END") {
+			break;
+		}
+		null(); // Add logic to handle help request, "?"
+		if (IsNumeric(sWeek)) {
+			int nWeek = stoi(sWeek);
+			if (nWeek >= 1 && nWeek <= assignments[-1].GetCourseWeeks()) {
+				while (1) {
+					cout << "'Discussions,' 'Quizzes,' 'Labs,' 'Projects,' 'Final,' or 'end?' ";
+					string sRequest;
+					cin >> sRequest;
+					string sRequestEdit = UpperCase(sRequest);
+					if (sRequestEdit == "END") {
+						break;
+					}
+					else if (sRequestEdit == "DISCUSSIONS" ||
+						sRequestEdit == "DISCUSSION" ||
+						sRequestEdit == "DISCUSS" ||
+						sRequestEdit == "DIS") {
+						AddAssignmentByType(assignments, students, 'D', "discussion",
+							assignments[-1].GetMaxScoreDiscussions(), nWeek);
+					}
+					else if (sRequestEdit == "QUIZZES" ||
+						sRequestEdit == "QUIZ" ||
+						sRequestEdit == "QUI") {
+						AddAssignmentByType(assignments, students, 'Q', "quizz",
+							assignments[-1].GetMaxScoreQuizzes(), nWeek);
+					}
+					else if (sRequestEdit == "LABS" ||
+						sRequestEdit == "LAB") {
+						AddAssignmentByType(assignments, students, 'L', "lab",
+							assignments[-1].GetMaxScoreLabs(), nWeek);
+					}
+					else if (sRequestEdit == "PROJECTS" ||
+						sRequestEdit == "PROJECT" ||
+						sRequestEdit == "PRO") {
+						AddAssignmentByType(assignments, students, 'P', "project",
+							assignments[-1].GetMaxScoreProjects(), nWeek);
+					}
+					else if (sRequestEdit == "FINAL" ||
+						sRequestEdit == "FIN" ||
+						sRequestEdit == "FI") {
+						if (nWeek == assignments[-1].GetCourseWeeks()) {
+							AddAssignmentByType(assignments, students, 'F', "final",
+								assignments[-1].GetMaxScoreFinalProject(), nWeek);
+						}
+						else {
+							cout << "Sorry, a final can only be added to the last week of the course.\n";
+							cin.ignore(INT_MAX, '\n');
+						}
+					}
+					else if (sRequestEdit == "?") {
+						Help_Assignment_Level_0();
+					}
+					else {
+						cout << "*Request - " << sRequest << " is invalid, try again.\n";
+						cin.ignore(INT_MAX, '\n');
+					}
+				}
+			}
+			else {
+				cout << "*Week must be from 1 to "
+					<< assignments[-1].GetCourseWeeks() << ".\n";
+				cin.ignore(INT_MAX, '\n');
+			}
+		}
+		else {
+			cout << "*Week must be from 1 to "
+				<< assignments[-1].GetCourseWeeks() << ".\n";
+			cin.ignore(INT_MAX, '\n');
+		}
+	}
+
+} /* end-of-primary function */
+
+
+//*
+//*** ASSIGNMENT SUBFUNCTION(S) SECTION
+//*
+
+// Local subfunction(s)
+//
+void AddAssignmentByType(Assignment* &assignments, Student* &students, char cArgCode,
+	string sArgType, double dArgMax, int nWeek) {
+	string sAssignmentWord = "W" + JustifyRight(nWeek, 2, '0') + cArgCode;
+	cout << "For week " << nWeek << " add " << sArgType
+		<< " assignments, max-score "
+		<< fixed << setprecision(1) << dArgMax << endl;
+	while (1) {
+		cout << "Student-Id or 'end'? ";
+		string sStudentId;
+		cin >> sStudentId;
+		sStudentId = UpperCase(sStudentId);
+		if (sStudentId == "END") {
+			break;
+		}
+		if (IsNumeric(sStudentId)
+			&& (stoi(sStudentId) >= 1 && stoi(sStudentId) <= students[-1].GetMaxStudentId())) {
+			int nStudentId = stoi(sStudentId);
+			int iStu = ScanForStudentId(students, nStudentId);
+			if (iStu != -1) {
+				int iDup = ScanForAssignment(assignments, nStudentId, nWeek, cArgCode);
+				if (iDup == -1) {
+					if (assignments[-1].GetNumOfAssignments() < assignments[-1].GetMaxAssignments()
+						|| assignments[-1].GetReclaimed() > 0) {
+						double dBonusPoints=0.0;
+						double dScore = GetScore(sArgType, dArgMax, dBonusPoints, students[iStu]);
+						int iAdd = AddAssignment(assignments, students[iStu],
+							nStudentId, nWeek, cArgCode, dScore, dArgMax, dBonusPoints); 
+						if (iAdd != -1) {
+							double courseGrade;
+							if (students[iStu].GetCumMax() == 0) {
+								courseGrade = 100.0;
+							}
+							else {
+								courseGrade = (students[iStu].GetCumScore() + dBonusPoints) * 100.0
+									/ students[iStu].GetCumMax();
+							}
+							cout << "-Assignment " << sAssignmentWord
+								<< " has been added to respository for "
+								<< students[iStu].GetFirstName() << " "
+								<< students[iStu].GetLastName() << "," << endl;
+							cout << "a total of " << students[iStu].GetAssignmentCount()
+								<< " assignments, a cumlative score of "
+								<< fixed << setprecision(1) << students[iStu].GetCumScore() << endl;
+							cout << "out of a possible of "
+								<< fixed << setprecision(1) << students[iStu].GetCumMax()
+								<< ", and a course grade of "
+								<< fixed << setprecision(2) << courseGrade << "%.\n";
+							if (students[-1].GetBonusLimit() != 0) {        // Bonus points enabled?
+								cout << "Bonus points: " << fixed << setprecision(1) << assignments[iAdd].GetBonus()
+									<< "/" << fixed << setprecision(1) << students[iStu].GetBonus()
+									<< endl;
+							}
+						}
+						else {
+							cout << "*Severe error adding assignment!\n.";
+							break;
+						}
+					}
+					else {
+						cout << "*New assignments cannot be added, a maximum of "
+							<< assignments[-1].GetMaxAssignments() << " has been reached.\n";
+						break;
+					}
+				}
+				else {                          // Assignment already exist!
+					// Edit, Delete, or Cancel
+					int iStu = ScanForStudentId(students, nStudentId);
+					if (iStu != -1) {
+						cout << "A " << sAssignmentWord << " assignment exist for "
+							<< students[iStu].GetLastName() << ", "
+							<< students[iStu].GetFirstName() << ".\n";
+					}
+					else {
+						cout << "A " << sAssignmentWord << " assignment is orphaned!\n";
+						break;
+					}
+					while (1) {
+						string sRequest;
+						cout << "Edit, delete or cancel? ";
+						cin >> sRequest;
+						string sEditRequest = UpperCase(sRequest);
+						if (sEditRequest == "CANCEL"
+							|| sEditRequest == "CAN"
+							|| sEditRequest == "C") {
+							break;
+						}
+						else if (sEditRequest == "DELETE"
+							|| sEditRequest == "DEL"
+							|| sEditRequest == "D") {
+							DeleteAssignment(assignments[iDup], students[iStu]);
+							break;
+						}
+						else if (sEditRequest == "EDIT"
+							|| sEditRequest == "E") {
+							EditAssignment(assignments[iDup], students[iStu],
+								sArgType, dArgMax, sAssignmentWord);
+							break;
+						}
+						else if (sEditRequest == "?") {
+							null();  /*pending*/
+						}
+						else {
+							cout << "Request - " << sRequest << " is invalid, try again.\n";
+							cin.ignore(INT_MAX, '\n');
+						}
+					}
+				}
+			}
+			else {
+
+				cout << "*Student-Id " << FormatId(nStudentId) << " does not exist, try again.\n";
+				cin.ignore(INT_MAX, '\n');
+			}
+		}
+		else {
+			cout << "*Student-Id must be from 1 to " << students[-1].GetMaxStudentId() << ".\n";
+			cin.ignore(INT_MAX, '\n');
+		}
+	}
+}
+
+
+void Help_Assignment_Level_0() {
+	cout << "Help:\n";
+	cout << "Add new student-Ids - type 'students,' 'student,' or 'stu.'\n";
+	cout << "Add new discussion asignments - type 'discussions,' 'discussion,' 'discuss,' or 'dis.'\n";
+	cout << "Add new quizz assignments - type 'quizzes,' 'quizz,' 'qui.'\n";
+	cout << "Add new lab assignments - type 'labs' or 'lab.'\n";
+	cout << "Add new project assignments - type 'projects,' 'project,' or 'pro.'\n";
+	cout << "Add the final assignment - type 'final,' 'fin,' or 'fi.'\n";
+	cout << "End assignments - type 'end.'\n";
+	cout << endl;
+}
+
+
+int ScanForAssignment(Assignment* &assignments, int nArgId, int nArgWeek, char cArgType) {
+	// Search for unique entity within assignment-object array
+	int nSearchMax = assignments[-1].GetNumOfAssignments();
+	for (int iii = 0; iii < nSearchMax; iii++) {
+		if (assignments[iii].GetId() == nArgId &&
+			assignments[iii].GetWeek() == nArgWeek &&
+			assignments[iii].GetCode() == cArgType) {
+			return iii;
+		}
+	}
+	return -1;
+}
+
+
+int AddAssignment(Assignment* &assignments, Student &student,
+	int nId, int nWeek, char cCode, double dScorePoints, double dMaxScore, double dBonusPoints) {
+	int iii = ReclaimAssignment(assignments);
+	if (iii != -1) {
+		// Pour the values in...
+		assignments[iii].SetId(nId);
+		assignments[iii].SetWeek(nWeek);
+		assignments[iii].SetCode(cCode);
+		assignments[iii].SetScorePoints(dScorePoints);
+		assignments[iii].SetMaxPoints(dMaxScore);
+		assignments[iii].SetBonus(dBonusPoints);
+		// and update Student totals
+		student += assignments[iii];
+		return iii;
+	}
+	else {
+		return -1;
+	}
+}
+
+
+int ReclaimAssignment(Assignment* &assignments) {
+	if (assignments[-1].GetReclaimed() >= 1) {
+		for (int iii = assignments[-1].GetNumOfAssignments() - 1; iii >= 0; iii--) { 
+			if (assignments[iii].GetId() == -1) {	// Reclaimed slot?
+				assignments[-1].DecrReclaimed();
+				return iii;
+			}
+		}
+		assert(("Reclaimed slots for Assignment-objects not found!", 0));  // Reclaim var in error. 
+		return 	-1; // Prevent compiler warning, "C4715." 
+	}
+	else {
+		return assignments[-1].ReserveEntity();
+	}
+}
+
+
+void DeleteAssignment(Assignment &assignment, Student &student)  {
+	if (ConfirmDelete() == false) { return; }
+
+	// Decrement student cumulations
+	student -= assignment;
+
+	// Void assignment record
+	assignment.Init();
+	//*
+	assignment.IncrReclaimed();
+}
+
+
+void EditAssignment(Assignment &assignment, Student &student, string sType, double dMaxScore,
+	string sWord) {
+
+	double dBonusPoints;
+	double dScore = GetScore(sType, dMaxScore, dBonusPoints, student);
+
+	// Decrement student cumulations	
+	student -= assignment;
+
+	// Replace assignment record
+	assignment.SetScorePoints(dScore);
+	assignment.SetMaxPoints(dMaxScore);
+	assignment.SetBonus(dBonusPoints);
+
+	// Increment student cumulations	
+	student += assignment;
+
+	double courseGrade;
+	if (student.GetCumMax() == 0) {
+		courseGrade = 100.0;
+	}
+	else {
+		courseGrade = (student.GetCumScore() + student.GetBonus()) * 100.0
+			/ student.GetCumMax();
+	}
+
+	cout << "-Assignment " << sWord
+		<< " has been replaced in respository for "
+		<< student.GetFirstName() << " "
+		<< student.GetLastName() << "," << endl;
+	cout << "a total of " << student.GetAssignmentCount()
+		<< " for a cumlative score of "
+		<< fixed << setprecision(1) << student.GetCumScore()
+		<< " out of a possible of "
+		<< fixed << setprecision(1) << student.GetCumMax()
+		<< ", and a course grade of "
+		<< fixed << setprecision(2) << courseGrade << "%.\n";
+}
+
+
+double GetScore(string sType, double dMaxScore, double &dBonusPoints, Student &student) {
+	double dScore;
+	dBonusPoints = 0.0;
+	while (1) {
+		cout << "Score? ";
+		cin >> dScore;
+		if (dScore >= 0 && dScore <= dMaxScore) {
+			return dScore;
+		}
+		else if ((student.GetBonus() + dScore - dMaxScore) <= student.GetBonusLimit()) {
+			dBonusPoints = dScore - dMaxScore;
+			while (1) {
+				cout << "Confirm " << dBonusPoints << " bonus points (yes/no)? ";
+				cin.ignore(INT_MAX, '\n');
+				string sRequest;
+				cin >> sRequest;
+				string sRequestEdit = UpperCase(sRequest);
+				if (sRequestEdit == "YES"
+					|| sRequestEdit == "Y") {			// confirmed? 
+					return dMaxScore;
+				}
+				else if (sRequestEdit == "NO"
+					|| sRequestEdit == "N") {			// rejected? 
+					dBonusPoints = 0.0;
+					return dMaxScore;
+				}
+				else if (sRequestEdit == "?") {
+					null();  /*pending*/
+				}
+				else {									// No, request undefined!
+					cout << "Request - " << sRequest << " is invalid, try again.\n";
+				}
+			}
+
+		}
+		else {
+			cout << "*A " << sType << " score must be from 0.0 to "
+				<< fixed << setprecision(1) << dMaxScore << endl;
+			cin.ignore(INT_MAX, '\n');
+		}
+	}
+}
+/*
+Name: List.cpp
+
+Type: Subfunction
+
+Description:
+This is the report manager function for Project2 requested by professor X.
+
+Maintenance
+========== === ========================================================
+2015/03/06 DLH Developed
+2015/03/17 DLH Redesign access-by-index to Student-and Assignment-functions
+2015/03/17 DLH Make static var reference functions stick out, [-1].
+2015/03/17 DLH Correct sort sequence field-check order.
+2015/03/27 DLH Manage console input buffer.
+2015/04/03 DLH Support bonus points backdoor
+2015/04/11 DLH Remove superfluous specifications info function prototypes
+*/
+
+#include <iostream>
+#include "Assignment.h"
+#include "Student.h"
+#include <iomanip>
+
+using namespace std;
+
+// Protoypes: Local functions
+Student** BuildIndex(Student*, int);
+void SortStudentsById(Student**, int);
+int SearchForId(Student**, int, int);
+void PurgeIndex(Student**&);
+//*
+Assignment** BuildIndex(Assignment*, int);
+void AssignCodeSeq(char*);
+void SortAssignments_WTI(Assignment**, int);
+void SortAssignments_IWT(Assignment**, int);
+void SortAssignments_TWI(Assignment**, int);
+void SortAssignments_WIT(Assignment**, int);
+void PurgeIndex(Assignment**&);
+//*
+void ListAllStudents(Student**&, int,
+	Assignment**&, int);
+void ListSoloStudent(Student*&,
+	Assignment**&, int);
+void ListAllWeeks(Assignment**&, int);
+void ListSoloWeek(Assignment**&, int, int);
+void ListAssignmentEntry(Assignment*&);
+void Help_List_Level_0();
+// Protoypes: external functions
+string FormatId(int);
+string UpperCase(string);  // Lower-to-upper case conversion function 
+void null();
+bool IsNumeric(const std::string&);
+string JustifyRight(int, int, char);
+
+
+void ListManager(Student* &students, Assignment* &assignments) {
+	// Setup listing environment
+	//*
+	// Build Student lookup table
+	int nStudentCount = students[-1].GetNumOfStudents();
+	Student**  ix_Student_Id = BuildIndex(students, nStudentCount);
+	//*
+	SortStudentsById(ix_Student_Id, nStudentCount);
+	//*
+	// Build Assignment lookup tables
+	int nAssignmentCount = assignments[-1].GetNumOfAssignments();
+	Assignment** ix_Assignment_WTI = BuildIndex(assignments, nAssignmentCount);
+	Assignment** ix_Assignment_IWT = BuildIndex(assignments, nAssignmentCount);
+	Assignment** ix_Assignment_TWI = BuildIndex(assignments, nAssignmentCount);
+	Assignment** ix_Assignment_WIT = BuildIndex(assignments, nAssignmentCount);
+	//*
+	SortAssignments_WTI(ix_Assignment_WTI, nAssignmentCount);
+	SortAssignments_IWT(ix_Assignment_IWT, nAssignmentCount);
+	SortAssignments_TWI(ix_Assignment_TWI, nAssignmentCount);
+	SortAssignments_WIT(ix_Assignment_WIT, nAssignmentCount);
+
+	// Process list requests until end requested
+	string sRequest;
+	while (1) {
+		cout << "Student, assignment, or end? ";
+		cin >> sRequest;
+		string sRequestEdit = UpperCase(sRequest);
+		if (sRequestEdit == "END") {
+			break;
+		}
+		if (sRequestEdit == "STUDENT" ||
+			sRequestEdit == "STU") {  // On STUDENTS and its aliases 
+			while (1) {
+				cout << "Student-Id, 'all,' or 'end'? ";
+				string sId;
+				int nId;
+				cin >> sId;
+				sId = UpperCase(sId);
+				if (sId == "END") {
+					break;
+				}
+				else if (sId == "ALL") {
+					ListAllStudents(ix_Student_Id, nStudentCount,
+						ix_Assignment_IWT, nAssignmentCount);
+				}
+				else if (IsNumeric(sId)
+					&& (stoi(sId) >= 1 && stoi(sId) <= students[-1].GetMaxStudentId())) {
+					nId = stoi(sId);
+					int iStu = SearchForId(ix_Student_Id, nStudentCount, nId);
+					if (iStu != -1) {
+						ListSoloStudent(ix_Student_Id[iStu],
+							ix_Assignment_IWT, nAssignmentCount);
+						cout << endl;
+					}
+					else {
+						cout << "*Student-Id " << FormatId(nId) << " not found!\n";
+						cin.ignore(INT_MAX, '\n');
+					}
+				}
+				else {
+					cout << "*Student-Id must be from 1 to " << students[-1].GetMaxStudentId() << ".\n";
+					cin.ignore(INT_MAX, '\n');
+				}
+			}
+		}
+		else if (sRequestEdit == "ASSIGNMENT" ||
+			sRequestEdit == "ASSIGN") {  // On ASSIGNMENTS and it aliases	
+			while (1) {
+				cout << "Week-number, 'all,' or 'end'? ";
+				string sWeek;
+				cin >> sWeek;
+				sWeek = UpperCase(sWeek);
+				if (sWeek == "END") {
+					break;
+				}
+				else if (sWeek == "ALL") {
+					ListAllWeeks(ix_Assignment_WTI, nAssignmentCount);
+					cout << endl;
+				}
+				else if (IsNumeric(sWeek)
+					&& (stoi(sWeek) >= 1 && stoi(sWeek)
+					<= assignments[-1].GetCourseWeeks())) {
+					ListSoloWeek(ix_Assignment_WTI, nAssignmentCount, stoi(sWeek));
+					cout << endl;
+				}
+				else {
+					cout << "*Week must be from 1 to " << assignments[-1].GetCourseWeeks() << ".\n";
+					cin.ignore(INT_MAX, '\n');
+				}
+			}
+		}
+		else if (sRequestEdit == "?") {
+			Help_List_Level_0();
+		}
+		else {
+			cout << "Request - " << sRequest << " is invalid, try again." << endl;
+			cin.ignore(INT_MAX, '\n');
+		}
+	}
+
+	// Breakdown listing environment
+	//*
+	// Purge lookup tables
+	PurgeIndex(ix_Assignment_WIT);
+	PurgeIndex(ix_Assignment_TWI);
+	PurgeIndex(ix_Assignment_IWT);
+	PurgeIndex(ix_Assignment_WTI);
+	PurgeIndex(ix_Student_Id);
+
+} /*End-of-primary function */
+
+
+//*
+//*** ASSIGNMENT SUBFUNCTION(S) SECTION
+//*
+
+// Local subfunction(s)
+//
+void ListAllStudents(Student** &students, int nStudentCount,
+	Assignment** &assignments, int nAssignmentCount) {
+	bool bReport = false;
+	for (int iii = 0; iii < nStudentCount; iii++) {
+		if (students[iii]->GetId() != -1) {     // Not reclaimed?
+			bReport = true;
+			ListSoloStudent(students[iii], assignments, nAssignmentCount);
+			cout << endl;
+		}
+	}
+	if (bReport) {
+		cout << ">end of students<\n";
+	}
+	else {
+		cout << ">no students recorded for course<\n";
+	}
+}
+
+
+void ListSoloStudent(Student* &student,
+	Assignment** &assignments, int nIdxAssignmentCount) {
+	int nId = student->GetId();
+	cout << endl
+		<< "Student-Id: " << FormatId(nId) << endl;
+	cout << "      Name: " << student->GetLastName()
+		<< ", " << student->GetFirstName() << endl;
+
+	cout << "-Statics:" << endl;
+	int nStudentAssignmentCount = student->GetAssignmentCount();
+	cout << " Scored assignments: " << nStudentAssignmentCount << endl;
+	cout << "              Score: " << fixed << setprecision(1) << student->GetCumScore()
+		<< " of " << fixed << setprecision(1) << student->GetCumMax() << " possible.\n";
+	if (student->GetBonusLimit() != 0) {        // Bonus points enabled?
+		cout << "       Bonus points: " << fixed << setprecision(1) << student->GetBonus() << endl;
+	}
+	//*	
+	double courseGrade;
+	if (student->GetCumMax() == 0) {
+		courseGrade = 100.0;
+	}
+	else {
+		double dBonus;
+		if (student->GetBonusLimit() != 0)      // Bonus points enabled?
+			dBonus = student->GetBonus();
+		else
+			dBonus = 0.0;
+		courseGrade = (student->GetCumScore() + dBonus) * 100.0
+			/ student->GetCumMax();
+	}
+	cout << "      Running grade: " << fixed << setprecision(2) << courseGrade << "%.\n";
+
+	cout << "-Assignments:" << endl;
+	if (nStudentAssignmentCount == 0) {
+		cout << " >no assignments recorded<\n";
+	}
+	else {
+		for (int iii = 0; iii < nIdxAssignmentCount; iii++) {
+			if (assignments[iii]->GetId() == nId) {
+				string sAssignmentWord = "W"
+					+ JustifyRight(assignments[iii]->GetWeek(), 2, '0')
+					+ assignments[iii]->GetCode();
+				cout << " " << sAssignmentWord << " score: "
+					<< fixed << setprecision(1) << assignments[iii]->GetScore() << " (or "
+					<< fixed << setprecision(2)
+					<< assignments[iii]->GetScore() * 100.0 / assignments[iii]->GetMax() << "%)";
+					if (student->GetBonusLimit() != 0) {    // Bonus points enabled?
+						cout << ", bonus-points("
+							<< fixed << setprecision(1) << assignments[iii]->GetBonus() << ")";
+					}
+					cout << endl;
+			}
+		}
+		cout << " >end of assignments<\n";
+	}
+}
+
+
+void ListAllWeeks(Assignment** &assignments, int nAssignmentCount) {
+	int nLastWeek = -1;
+	bool bReport = false;
+	for (int iii = 0; iii < nAssignmentCount; iii++) {
+		if (assignments[iii]->GetId() != -1) {  // Not reclaimed assignments 
+			if (nLastWeek != assignments[iii]->GetWeek()) {
+				cout << endl;
+				nLastWeek = assignments[iii]->GetWeek();
+			}
+			bReport = true;
+			ListAssignmentEntry(assignments[iii]);
+		}
+	}
+	if (bReport) {
+		cout << ">end of assignments<\n";
+	}
+	else {
+		cout << ">no assignments recorded for course<\n";
+	}
+	cout << endl;
+}
+
+
+void ListSoloWeek(Assignment** &assignments, int nAssignmentCount, int nWeek) {
+	bool bReport = false;
+	for (int iii = 0; iii < nAssignmentCount; iii++) {
+		if (nWeek == assignments[iii]->GetWeek()) {
+			bReport = true;
+			ListAssignmentEntry(assignments[iii]);
+		}
+		else if (assignments[iii]->GetWeek() > nWeek) {
+			break;
+		}
+	}
+	if (bReport) {
+		cout << ">end of week's assignments<\n";
+	}
+	else {
+		cout << ">no assignments recorded for week " << nWeek << "<\n";
+	}
+}
+
+
+void ListAssignmentEntry(Assignment* &assignment) {
+	string sAssignmentWord = "W"
+		+ JustifyRight(assignment->GetWeek(), 2, '0')
+		+ assignment->GetCode();
+	cout << sAssignmentWord << " "
+		<< FormatId(assignment->GetId())
+		<< " score: "
+		<< fixed << setprecision(1) << assignment->GetScore() << " (or "
+		<< fixed << setprecision(2)
+		<< assignment->GetScore() * 100.0 / assignment->GetMax()
+		<< "%) Bonus points: "
+		<< fixed << setprecision(1) << assignment->GetBonus() << endl;
+}
+
+
+void Help_List_Level_0() {
+	cout << "Help:\n";
+	cout << "List respository by student - type 'student,' or 'stu.'\n";
+	cout << "List respository by assignment - type 'assignment' or 'assign.'\n";
+	cout << "End list - type 'end.'\n";
+	cout << endl;
+}
+
+
+Student** BuildIndex(Student* students, int nEntries) {
+	Student** retIdx = new Student*[nEntries];
+	for (int iii = 0; iii < nEntries; iii++) retIdx[iii] = &students[iii];
+	return retIdx;
+}
+
+
+void PurgeIndex(Student** &students) {
+	delete[] students;
+	students = 0;
+}
+
+
+void SortStudentsById(Student** students, int nEntries) {
+	// Function: Standard Shell-Metzner sort routine
+	// Sourced: http://www.oocities.org/athens/acropolis/2692/computer/sortroutines.html
+	int iii;
+	int jjj;
+	int kkk;
+	int lll;
+	int mmm;
+	int nnn(nEntries);
+
+	mmm = nnn;
+	while (1) {
+		mmm /= 2;
+		if (mmm == 0) break;
+		kkk = nnn - mmm;
+		jjj = 1;
+		while (jjj <= kkk) {
+			iii = jjj;
+			while (iii >= 1) {
+				lll = iii + mmm;
+				// Compare field in student-Id in ascending sequence
+				if (students[iii - 1]->GetId() > students[lll - 1]->GetId()) {
+					swap(students[iii - 1], students[lll - 1]);
+					iii -= mmm;
+				}
+				else
+					break;
+			}
+			jjj += 1;
+		}
+	}
+}
+
+
+int SearchForId(Student** students, int nEntries, int nId) {
+	// Function: Binary-search for student-Id 
+	int ixFirst = 0,  // Range the first entry
+		ixLast = nEntries - 1,  // Range the last entry
+		ixMiddle;
+
+	while (ixFirst <= ixLast) {  // Counduct the search as long as there is segment worth searching.
+		ixMiddle = (ixFirst + ixLast) / 2;  //Examine the entry in the middle
+		if (students[ixMiddle]->GetId() == nId) {  // Entry found?
+			return ixMiddle;  // Return index to entry.			
+		} // Entry not found on this pass!
+		else if (students[ixMiddle]->GetId() > nId)  // Which half to search?
+			ixLast = ixMiddle - 1;  //  Search the top half. 
+		else
+			ixFirst = ixMiddle + 1;  // Search the bottom half.
+	}
+	return -1;  // Entry not found, so send a false response!
+}
+
+
+Assignment** BuildIndex(Assignment* assignments, int nEntries) {
+	Assignment** retIdx = new Assignment*[nEntries];
+	for (int iii = 0; iii < nEntries; iii++) retIdx[iii] = &assignments[iii];
+	return retIdx;
+}
+
+
+void PurgeIndex(Assignment** &assignments) {
+	delete[] assignments;
+	assignments = 0;
+}
+
+
+void SortAssignments_WTI(Assignment** assignments, int nEntries) {
+	// Function: Multi-field Shell-Metzner sort routine
+	// Sourced: http://www.oocities.org/athens/acropolis/2692/computer/sortroutines.html
+	int iii;
+	int jjj;
+	int kkk;
+	int lll;
+	int mmm;
+	int nnn(nEntries);
+
+	// Setup special sort sequence for assignment types
+	char codeSeq[128];
+	AssignCodeSeq(codeSeq);
+
+	mmm = nnn;
+	while (1) {
+		mmm /= 2;
+		if (mmm == 0) break;
+		kkk = nnn - mmm;
+		jjj = 1;
+		while (jjj <= kkk) {
+			iii = jjj;
+			while (iii >= 1) {
+				lll = iii + mmm;
+				// Compare fields in (Week, Type, Student-Id) ascending sequence
+				if (assignments[iii - 1]->GetWeek() > assignments[lll - 1]->GetWeek()) {
+					swap(assignments[iii - 1], assignments[lll - 1]);
+					iii -= mmm;
+				}
+				else if (assignments[iii - 1]->GetWeek() == assignments[lll - 1]->GetWeek()) {
+					char AAA = assignments[iii - 1]->GetCode();
+					char BBB = assignments[lll - 1]->GetCode();
+					if (codeSeq[AAA] > codeSeq[BBB]) {
+						swap(assignments[iii - 1], assignments[lll - 1]);
+						iii -= mmm;
+					}
+					else if (codeSeq[AAA] == codeSeq[BBB]) {
+						if (assignments[iii - 1]->GetId() > assignments[lll - 1]->GetId()) {
+							swap(assignments[iii - 1], assignments[lll - 1]);
+							iii -= mmm;
+						}
+						else
+							break;
+					}
+					else
+						break;
+				}
+				else
+					break;
+			}
+			jjj += 1;
+		}
+	}
+}
+
+
+void SortAssignments_IWT(Assignment** assignments, int nEntries) {
+	// Function: Multi-field Shell-Metzner sort routine
+	// Sourced: http://www.oocities.org/athens/acropolis/2692/computer/sortroutines.html
+	int iii;
+	int jjj;
+	int kkk;
+	int lll;
+	int mmm;
+	int nnn(nEntries);
+
+	// Setup special sort sequence for assignment types
+	char codeSeq[128];
+	AssignCodeSeq(codeSeq);
+
+	mmm = nnn;
+	while (1) {
+		mmm /= 2;
+		if (mmm == 0) break;
+		kkk = nnn - mmm;
+		jjj = 1;
+		while (jjj <= kkk) {
+			iii = jjj;
+			while (iii >= 1) {
+				lll = iii + mmm;
+				// Compare fields in (Student-Id, Week, Type) ascending sequence
+				if (assignments[iii - 1]->GetId() > assignments[lll - 1]->GetId()) {
+					swap(assignments[iii - 1], assignments[lll - 1]);
+					iii -= mmm;
+				}
+				else if (assignments[iii - 1]->GetId() == assignments[lll - 1]->GetId()) {
+					if (assignments[iii - 1]->GetWeek() > assignments[lll - 1]->GetWeek()) {
+						swap(assignments[iii - 1], assignments[lll - 1]);
+						iii -= mmm;
+					}
+					else if (assignments[iii - 1]->GetWeek() == assignments[lll - 1]->GetWeek()) {
+						char AAA = assignments[iii - 1]->GetCode();
+						char BBB = assignments[lll - 1]->GetCode();
+						if (codeSeq[AAA] > codeSeq[BBB]) {
+							swap(assignments[iii - 1], assignments[lll - 1]);
+							iii -= mmm;
+						}
+						else
+							break;
+					}
+					else
+						break;
+				}
+				else
+					break;
+			}
+			jjj += 1;
+		}
+	}
+}
+
+
+void SortAssignments_TWI(Assignment** assignments, int nEntries) {
+	// Function: Multi-field Shell-Metzner sort routine
+	// Sourced: http://www.oocities.org/athens/acropolis/2692/computer/sortroutines.html
+	int iii;
+	int jjj;
+	int kkk;
+	int lll;
+	int mmm;
+	int nnn(nEntries);
+
+	// Setup special sort sequence for assignment types
+	char codeSeq[128];
+	AssignCodeSeq(codeSeq);
+
+	mmm = nnn;
+	while (1) {
+		mmm /= 2;
+		if (mmm == 0) break;
+		kkk = nnn - mmm;
+		jjj = 1;
+		while (jjj <= kkk) {
+			iii = jjj;
+			while (iii >= 1) {
+				lll = iii + mmm;
+				// Compare fields in (Type, Week, Student-Id) ascending sequence
+				char AAA = assignments[iii - 1]->GetCode();
+				char BBB = assignments[lll - 1]->GetCode();
+				if (codeSeq[AAA] > codeSeq[BBB]) {
+					swap(assignments[iii - 1], assignments[lll - 1]);
+					iii -= mmm;
+				}
+				else if (codeSeq[AAA] == codeSeq[BBB]) {
+					if (assignments[iii - 1]->GetWeek() > assignments[lll - 1]->GetWeek()) {
+						swap(assignments[iii - 1], assignments[lll - 1]);
+						iii -= mmm;
+					}
+					else if (assignments[iii - 1]->GetWeek() == assignments[lll - 1]->GetWeek()) {
+						if (assignments[iii - 1]->GetId() > assignments[lll - 1]->GetId()) {
+							swap(assignments[iii - 1], assignments[lll - 1]);
+							iii -= mmm;
+						}
+						else
+							break;
+					}
+					else
+						break;
+				}
+				else
+					break;
+			}
+			jjj += 1;
+		}
+	}
+}
+
+
+void SortAssignments_WIT(Assignment** assignments, int nEntries) {
+	// Function: Multi-field Shell-Metzner sort routine
+	// Sourced: http://www.oocities.org/athens/acropolis/2692/computer/sortroutines.html
+	int iii;
+	int jjj;
+	int kkk;
+	int lll;
+	int mmm;
+	int nnn(nEntries);
+
+	// Setup special sort sequence for assignment types
+	char codeSeq[128];
+	AssignCodeSeq(codeSeq);
+
+	mmm = nnn;
+	while (1) {
+		mmm /= 2;
+		if (mmm == 0) break;
+		kkk = nnn - mmm;
+		jjj = 1;
+		while (jjj <= kkk) {
+			iii = jjj;
+			while (iii >= 1) {
+				lll = iii + mmm;
+				// Compare fields in (Week, Student-Id, Type) ascending sequence
+				if (assignments[iii - 1]->GetWeek() > assignments[lll - 1]->GetWeek()) {
+					swap(assignments[iii - 1], assignments[lll - 1]);
+					iii -= mmm;
+				}
+				else if (assignments[iii - 1]->GetWeek() == assignments[lll - 1]->GetWeek()) {
+					if (assignments[iii - 1]->GetId() > assignments[lll - 1]->GetId()) {
+						swap(assignments[iii - 1], assignments[lll - 1]);
+						iii -= mmm;
+					}
+					else if (assignments[iii - 1]->GetId() == assignments[lll - 1]->GetId()) {
+						char AAA = assignments[iii - 1]->GetCode();
+						char BBB = assignments[lll - 1]->GetCode();
+						if (codeSeq[AAA] > codeSeq[BBB]) {
+							swap(assignments[iii - 1], assignments[lll - 1]);
+							iii -= mmm;
+						}
+						else {
+							break;
+						}
+					}
+					break;
+				}
+				else
+					break;
+			}
+			jjj += 1;
+		}
+	}
+}
+
+
+void AssignCodeSeq(char codeSeq[]) { /*pending*/
+	// Build assignment-code sort-sequence translation table
+	for (int iii = 0; iii < 128; iii++) { codeSeq[iii] = 0; }
+	codeSeq['D'] = char(1); // D-iscussion
+	codeSeq['Q'] = char(2); // Q-uizz
+	codeSeq['L'] = char(3); // L-ab
+	codeSeq['P'] = char(4); // P-roject
+	codeSeq['F'] = char(5); // F-inal
+}
+/*
+Name: DBLoad.cpp
+
+Type: Main function
+
+Description:
+This is the database loader function for Project2, loading the blackboard
+data base.
+
+To reduce I/O overhead this database will be maintained logically; that
+is only active records followed by a inactive record, serving as
+logical end-of-file indicator.  Ultimately, this design choice will result
+in a reorg-at-startup.  In addition a check will be made, assuring
+the current configuration will permit the DB load.
+
+Maintenance
+========== === ========================================================
+2015/03/28 DLH Developed
+2015/04/03 DLH Support bonus points backdoor
+2015/04/11 DLH Remove superfluous specifications info function prototypes
+2015/04/12 DLH Performance: lineup GetName function
+
+*/
+
+#include "Assignment.h"
+#include "Student.h"
+//
+#include <iostream>								// Console I/O
+#include <fstream>								// File I/O
+//
+#include <atlbase.h>							// ADTs 
+#include <string>
+#include <cassert>								// Conditional assert
+
+using namespace std;
+
+// Protoypes: Local functions
+int QueryPath(string);
+int CreatePath(string);
+string GetWorkingDirectory ();
+inline string GetName(fstream&);
+string TCHAR_to_String(TCHAR*);
+bool readDataBase(Student*, Assignment*, string, bool, bool);
+// Prototypes: External functions 
+bool StoreDataBase(Student*&, Assignment*&, bool);
+
+char readBuffer[BUFSIZ];							// Allocate buffer at std I/O size
+int readNameLength;
+
+bool LoadDataBase(Student* &students, Assignment* &assignments) {
+	bool loadStatus = true;
+
+	// Validate confiquration before we get started
+	assert(("Too short, DIRECTORY_NAME", string(DIRECTORY_NAME).length() >= 1));
+	assert(("Too short, FILE_EXTENSION", string(FILE_EXTENSION).length() >= 1));
+	assert(("Too short, STUDENT_FILE_STEM", string(STUDENT_FILE_STEM).length() >= 1));
+	assert(("Too short, ASSIGNMENT_FILE_STEM", string(ASSIGNMENT_FILE_STEM).length() >= 1));
+	assert(("Must be different", string(STUDENT_FILE_STEM) != string(ASSIGNMENT_FILE_STEM)));
+    
+	// Establish the path for the database components
+	string dbPath = string(DIRECTORY_NAME);
+	if (QueryPath(dbPath)) {					// Path exist?
+		return readDataBase(students, assignments, dbPath, true, false);
+	}
+	else {										// Path DNE!
+		string sShowPath;
+		if (dbPath[1] == '\\'
+			|| (dbPath.length() >= 2 && dbPath[1] == ':')) {				// Absolute path?
+			sShowPath = dbPath;
+		}
+		else {									// No, relative path!		
+			sShowPath = GetWorkingDirectory () + string(PATHNAME_SEPERATOR) + dbPath;
+		}
+		if (CreatePath(dbPath)) {				// Path created?
+			cout << "-Directory built for database components: \n";
+			cout << "    " << sShowPath << endl;
+			return readDataBase(students, assignments, dbPath, false, true);
+		}
+		else {									// No, create failed!
+			cout << "*Directory for database could not be created.\n";
+			cout << "    " << sShowPath << endl;
+			return false;
+		}
+	}
+
+} /* end-of-primary function */
+
+//
+//* Subfunctions
+//
+
+bool readDataBase(Student* students, Assignment* assignments,
+	string dbPath, bool bPathExisted, bool bPathCreated) {
+	bool loadStatus = true;
+	// Construct the complete filenames for the database components
+	string studentsFilename = dbPath + string(PATHNAME_SEPERATOR)
+		+ string(STUDENT_FILE_STEM)
+		+ string(FILE_EXTENSION);
+	fstream students_FS;
+	//*
+	string assignmentsFilename = dbPath + string(PATHNAME_SEPERATOR)
+		+ string(ASSIGNMENT_FILE_STEM)
+		+ string(FILE_EXTENSION);
+	fstream assignments_FS;
+
+	if (bPathExisted && QueryPath(studentsFilename)) {	// Student-component already exist?		
+		if (QueryPath(assignmentsFilename)) {	// Assignment-component already exist?
+			//
+			//* Students load section
+			// 	
+			students_FS.open(studentsFilename, ios::in | ios::binary);
+			if (students_FS.good()) {                   // Students-component open?
+				cout << "-Loading database, students-component...\n";
+				int idx = 0;
+				int dummyCount = 0;
+				bool loadEnabled = true;
+				Student dummyStudent;
+				//*
+				while (1) {                         // Loading students component...
+					if (loadEnabled) {			// Still loading students array? 
+						students[idx].Load(students_FS);
+						if (!students_FS.good()) {	// Read error detected?	
+							loadStatus = false;
+							cout << "*Error reading students-component!\n";
+							break;
+						}
+						if (students[idx].GetId() == EOF) { break; }
+					}
+					else {						// No, loading dummy object!
+						dummyStudent.Load(students_FS);
+						if (!students_FS.good()) {	// Read error detected?	
+							loadStatus = false;
+							cout << "*Error reading students-component!\n";
+							break;
+						}
+						if (dummyStudent.GetId() == EOF) { break; }
+					}
+					if (++idx >= MAX_STUDENTS) { loadEnabled = false; }		// Disable load if max'd out 
+				}
+
+				if (loadEnabled) {				//  Fully loaded? 
+					students[-1].SetNumOfStudents(idx);
+					students[-1].ResetModified();
+				}								// No, configuration max'd out! 
+				else if (++idx > MAX_STUDENTS) {
+					loadStatus = false;
+					cout << "*Reconfig MAX_STUDENTS, " << idx << " entries required.\n";
+				}
+				students_FS.close();
+			}
+			else {                              // Open failed for students component!
+				cout << "*Severe error during open of students-component of database!\n";
+				loadStatus = false;
+			}
+			//
+			//* Assignments load section
+			// 	
+			assignments_FS.open(assignmentsFilename, ios::in | ios::binary);
+			if (assignments_FS.good()) {	// Assignments-component open?
+				cout << "-Loading database, assignments-component...\n";
+				int idx = 0;
+				int dummyCount = 0;
+				bool loadEnabled = true;
+				Assignment dummyAssignment;
+				//*
+				while (1) {                     // Loading Assignments component...
+					if (loadEnabled) {
+						assignments[idx].Load(assignments_FS);
+						if (!assignments_FS.good()) {
+							loadStatus = false;
+							cout << "*Error reading assignments-component!\n";
+							break;
+						}
+						if (assignments[idx].GetWeek() == EOF) { break; }
+					}
+					else {
+						dummyAssignment.Load(assignments_FS);
+						if (!assignments_FS.good()) {
+							loadStatus = false;
+							cout << "*Error reading assignments-component!\n";
+							break;
+						}
+						if (dummyAssignment.GetWeek() == EOF) { break; }
+					}
+					if (++idx >= MAX_ASSIGNMENTS) { loadEnabled = false; }
+				}
+
+				if (loadEnabled) {				// Fully loaded?
+					assignments[-1].SetNumOfAssignments(idx);
+					assignments[-1].ResetModified();
+				}								// No, max'd out!
+				else if (++idx > MAX_ASSIGNMENTS) {
+					loadStatus = false;
+					cout << "*Reconfig MAX_ASSIGNMENTS, " << idx << " entries required.\n";
+				}
+				assignments_FS.close();
+			}									// Open failed for assignments components!
+			else {
+				cout << "*Severe error during open of assignments-component of database!\n";
+				loadStatus = false;
+			}
+		}										// Assignments component is MIA!
+		else {
+			cout << "*Assignments-component file is missing!\n";
+			loadStatus = false;
+		}
+	}
+	else {										// Students component DNE!
+		loadStatus = StoreDataBase(students, assignments, true);	// Write logical EOFs for components
+	}
+	return loadStatus;
+}
+
+
+void Student::Load(fstream &input_FS) {
+	//***Synchronize field sequence with Student-Store function
+	//* fixed-length fields
+	input_FS.read(reinterpret_cast<char*>(&m_nId), sizeof(m_nId));
+	input_FS.read(reinterpret_cast<char*>(&m_nAssignmentCount), sizeof(m_nAssignmentCount));
+	input_FS.read(reinterpret_cast<char*>(&m_dCumScore), sizeof(m_dCumScore));
+	input_FS.read(reinterpret_cast<char*>(&m_dCumMax), sizeof(m_dCumMax));
+	input_FS.read(reinterpret_cast<char*>(&m_dCumBonus), sizeof(m_dCumBonus));
+    //* Variable-length fields
+	m_sLastName = GetName(input_FS);     
+	m_sFirstName = GetName(input_FS);
+}
+
+
+void Assignment::Load(fstream &input_FS) {
+	//***Synchronize field sequence with Assignment-Store function
+    //* fixed-length fields
+	input_FS.read(reinterpret_cast<char*>(&m_nId), sizeof(m_nId));
+	input_FS.read(reinterpret_cast<char*>(&m_nWeek), sizeof(m_nWeek));
+	input_FS.read(reinterpret_cast<char*>(&m_sCode), sizeof(m_sCode));
+	input_FS.read(reinterpret_cast<char*>(&m_dScorePoints), sizeof(m_dScorePoints));
+	input_FS.read(reinterpret_cast<char*>(&m_dMaxPoints), sizeof(m_dMaxPoints));
+	input_FS.read(reinterpret_cast<char*>(&m_dBonusPoints), sizeof(m_dBonusPoints));
+}
+
+
+string GetName(fstream &input_FS) {
+	// Pull a variable-length string of chars. from the input file, a
+	// string prefixed by a 4-byte integer containing the length.
+	input_FS.read(reinterpret_cast<char*>(&readNameLength), sizeof(readNameLength));
+	input_FS.read(readBuffer, readNameLength);
+	readBuffer[readNameLength] = '\0';
+	
+	return readBuffer;
+}
+
+
+int QueryPath(string sPath) {
+	// Function: Test for path's existence
+	// Source: stackoverflow.com forum, "How to convert std::string to LPCWSTR in C++ (Unicode)"
+	//         msdn.microsoft.com, "PathFileExists function"
+	// Resources: atlbase.h-include for PathFileExists. 
+	wstring wsTemp(sPath.begin(), sPath.end());
+	LPCWSTR lpcTemp = wsTemp.c_str();
+
+	return PathFileExists(lpcTemp);
+}
+
+
+int CreatePath(string sPath) {
+	// Function: Create path
+	// Source: stackoverflow.com forum, "How to convert std::string to LPCWSTR in C++ (Unicode)"
+	//         --by James EJ  
+	//         msdn.microsoft.com, "CreateDirectory function"
+	// Resources: atlbase-include for CreateDirectory. 
+	wstring wsTemp(sPath.begin(), sPath.end());
+	LPCTSTR lpcTemp = wsTemp.c_str();
+
+	return CreateDirectory(lpcTemp, 0);
+}
+
+string GetWorkingDirectory () {
+	// Function: Get working directory
+	// Source: stackoverflow.com forum, "How to get Current Directory?" by Yves Baumes  
+	// Resources: windows.h-include
+	TCHAR workingDirectory[MAX_PATH];
+	DWORD status = GetCurrentDirectory(MAX_PATH, workingDirectory);
+
+	return TCHAR_to_String(workingDirectory);
+}
+
+
+string TCHAR_to_String(TCHAR* argValue) {
+	// Function: Convert TCHAR array to a string
+	// Source: stackoverflow.com forum, "Converting TCHAR to string in C++" by OhadM  
+	// Resources: string-include
+	wstring wTemp(&argValue[0]);                // Convert TCHAR to wstring.
+	string sTemp(wTemp.begin(), wTemp.end());   // Convert wstring to string. 
+
+	return sTemp;
+}
+/*
+Name: DBStore.cpp
+
+Type: Main function
+
+Description:
+This is the database unload function for Project2, unloading the blackboard
+data base to secondary storage, unloading it only if change(s) have been made.
+In addition, to save I/O and secondary storage, only active records will 
+be written, followed by one inactive record, serving as a logical end-of-file.
+
+Maintenance
+========== === ========================================================
+2015/03/28 DLH Developed
+2015/03/30 DLH Flush the buffers and verify commit before reset.
+2015/04/03 DLH Support bonus points backdoor
+2015/04/11 DLH Remove superfluous specifications info function prototypes
+2015/04/12 DLH Performance: lineup PutName function
+*/
+
+#include "Assignment.h"
+#include "Student.h"
+//
+#include <iostream>
+#include <fstream>
+//
+#include <string>
+#include <cassert>
+
+using namespace std;
+
+// Protoypes: Local functions
+inline void PutName(fstream&, string);
+
+int writeNameLength;
+
+
+bool StoreDataBase(Student* &students, Assignment* &assignments, bool bInitialOption) {
+	bool storeStatus = true;
+	bool updateRequested = false;
+
+	// Choose "stage names" for messages
+	string sUpdate1, sUpdate2, sUpdate3;
+	if (bInitialOption) {						// Initializing?
+		sUpdate1 = "Initializing", sUpdate2 = "Initialization", sUpdate3 = "initialization";
+	}
+	else {										// No, updating!
+		sUpdate1 = "Updating", sUpdate2 = "Update", sUpdate3 = "update";
+	}
+	
+    // Serialize student-objects
+	if (students[-1].GetModified()
+		|| bInitialOption) {           // Modifications to save?
+		updateRequested = true;
+		bool updateComplete = true;
+		// Construct database path and file names for student component
+		string studentsFilename = string(DIRECTORY_NAME) + string(PATHNAME_SEPERATOR)
+			+ string(STUDENT_FILE_STEM)
+			+ string(FILE_EXTENSION);
+		fstream students_FS;
+        //*
+		students_FS.open(studentsFilename, ios::out | ios::binary);
+		if (students_FS.good()) {               // Open successful?
+			cout << "-" << sUpdate1 << " database, students-component...\n";
+			// Write active records
+			int nNumbOfStudents = students[-1].GetNumOfStudents();
+			for (int iii = 0; iii <= nNumbOfStudents; iii++) { 
+				if (students[iii].GetId() != EOF) {  // Active object?
+					students[iii].Store(students_FS);
+					if (!students_FS.good()) {
+						updateComplete = false;
+						break;
+					}
+				}
+			}
+			if (updateComplete) {               // All active objects written?
+				// Write pseudo end-of-file
+				Student students_EOF;
+				students_EOF.Store(students_FS);
+				if (students_FS.good()) {       // end-of-file trailer written?
+					// Flush the buffers to verify commit before reset
+					students_FS.flush();
+					if (students_FS.good()) {   // All objects commited?
+						students[-1].ResetModified();
+					}
+					else {                      // No, objects not commited!
+						updateComplete = false;
+					}
+				}
+				else {                          // No, end-of-file not written!
+					updateComplete = false;					
+				}
+			}
+			if (!updateComplete) {                  // Any failing updates along the way?
+				storeStatus = false;
+				cout << "*" << sUpdate2 << " failed for Students-component!\n";
+			}
+			students_FS.close();
+		}                                       // Open failed!
+		else {
+			cout << "*Open for output failed for students-component!\n";
+			storeStatus = false;
+		}
+	}
+
+    // Serialize Assignment-objects
+	if (assignments[-1].GetModified()
+		|| bInitialOption) {
+		updateRequested = true;
+		bool updateComplete = true;
+		// Construct database path and file names for student component
+		string assignmentsFilename = string(DIRECTORY_NAME) + string(PATHNAME_SEPERATOR)
+			+ string(ASSIGNMENT_FILE_STEM)
+			+ string(FILE_EXTENSION);
+		fstream assignments_FS;
+        //*
+		assignments_FS.open(assignmentsFilename, ios::out | ios::binary);
+		if (assignments_FS.good()) {            // Open successful?
+			cout << "-" << sUpdate1 << " database, assignments-component...\n";
+			// Write all active objects
+			int nNumOfAssignments = assignments[-1].GetNumOfAssignments();
+			for (int iii = 0; iii <= nNumOfAssignments; iii++) { 
+				if (assignments[iii].GetWeek() != EOF) { // Active object?
+					assignments[iii].Store(assignments_FS);
+					if (!assignments_FS.good()) {
+						updateComplete = false;
+						break;
+					}
+				}
+			}
+
+			if (updateComplete) {                  // Active objects written?
+				// Write pseudo end-of-file
+				Assignment assignments_EOF;
+				assignments_EOF.Store(assignments_FS);
+				if (assignments_FS.good()) {       // end-of-file trailer written?
+					// Flush the buffers to verify commit before reset
+					assignments_FS.flush();
+					if (assignments_FS.good()) {   // All objects commited?
+						students[-1].ResetModified();
+					}
+					else {                      // No, objects not commited!
+						updateComplete = false;
+					}
+				}
+				else {                          // No, end-of-file not written!
+					updateComplete = false;
+				}
+			}
+			if (!updateComplete) {                  // Any failing writes along the way?
+				storeStatus = false;
+				cout << "*" << sUpdate2 << " failed for assignments-component!\n";
+			}
+			assignments_FS.close();
+		}                                       // Open failed!
+		else {
+			cout << "*Open for output failed for assignments-component!\n";
+			storeStatus = false;
+		}
+	}
+
+    //  Issue update status message
+	if (updateRequested) {
+		if (storeStatus) {
+			cout << "-Database " << sUpdate3 << " completed.\n";
+		}
+		else {
+			cout << "-Database " << sUpdate3 << " failed!\n";
+		}
+	}
+
+	return storeStatus;
+
+} /* end-of-primary function */
+
+//
+//* Subfunctions
+//
+void Student::Store(fstream &output_FS) {
+    //***Synchronize field sequence with Student-Load function
+    //* fixed-length fields
+	output_FS.write(reinterpret_cast<char*>(&m_nId), sizeof(m_nId));
+	output_FS.write(reinterpret_cast<char*>(&m_nAssignmentCount), sizeof(m_nAssignmentCount));
+	output_FS.write(reinterpret_cast<char*>(&m_dCumScore), sizeof(m_dCumScore));
+	output_FS.write(reinterpret_cast<char*>(&m_dCumMax), sizeof(m_dCumMax));
+	output_FS.write(reinterpret_cast<char*>(&m_dCumBonus), sizeof(m_dCumBonus));
+    //* Variable-length  fields
+	PutName(output_FS, m_sLastName);
+	PutName(output_FS, m_sFirstName);
+}
+
+
+void Assignment::Store(fstream &output_FS) {
+	//***Synchronize field sequence with Assignment-Load function
+    //* fixed-length fields
+	output_FS.write(reinterpret_cast<char*>(&m_nId), sizeof(m_nId));
+	output_FS.write(reinterpret_cast<char*>(&m_nWeek), sizeof(m_nWeek));
+	output_FS.write(reinterpret_cast<char*>(&m_sCode), sizeof(m_sCode));
+	output_FS.write(reinterpret_cast<char*>(&m_dScorePoints), sizeof(m_dScorePoints));
+	output_FS.write(reinterpret_cast<char*>(&m_dMaxPoints), sizeof(m_dMaxPoints));
+	output_FS.write(reinterpret_cast<char*>(&m_dBonusPoints), sizeof(m_dBonusPoints));
+}
+
+
+void PutName(fstream &output_FS, string sName) {
+	writeNameLength = sName.length();
+	output_FS.write(reinterpret_cast<char*>(&writeNameLength), sizeof(writeNameLength));
+	output_FS.write(sName.data(), writeNameLength);
+}

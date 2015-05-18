@@ -1,0 +1,22 @@
+Student class
+- unique id
+- firstName
+- lastName
+- save/load
+- creation checks database to make sure student doesn't exist
+- add ability to edit students
+
+Assignment class
+- unique id
+- type: quiz, exam, program, discussion, custom
+- title
+- save/load
+- creation checks database to make sure assignment doesn't exist?
+- add ability to edit assignments
+
+track what assignments a student has taken and their scores
+
+h / cpp files
+test programs?
+
+- ability to see total grade / possible grade

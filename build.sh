@@ -1,3 +1,4 @@
 #!/bin/bash
 
-g++ ./src/main.cpp ./src/Student.cpp -o ./whiteboard -lsqlite3
+mkdir -p ./bin
+g++ ./src/main.cpp ./src/Student.cpp -o ./bin/whiteboard -lsqlite3

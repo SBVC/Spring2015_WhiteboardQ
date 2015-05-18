@@ -17,14 +17,13 @@ class Student {
 
   protected:
     static long getNextID() {return nextID++;}
-    /**-/static void openConnection() {
+    static void openConnection() {
       int error = sqlite3_open("database.sl3", &connection);
       if (error) {
         //needs to like crash the program or something
         std::cerr << "Database (database.sl3) could not be opened." << std::endl;
-        return;// 0;
       }
-    }//*/
+    }
 
   public:
     Student();
@@ -46,6 +45,8 @@ class Student {
     const static std::string errorLastName;
     const static std::string errorFirstName;
 };
+
+//Student::connectionOpen = false;
 
 /*
 int error = sqlite3_open("database.sl3", &Student::connection);

@@ -1,30 +1,22 @@
 #include "Student.h"
 #include <sqlite3.h>
 #include <string>
-//#include <iostream>
 
 long Student::nextID = 0;
-//sqlite3_open("database.sl3", &Student::connection);
-
-/*
-int error = sqlite3_open("database.sl3", &Student::connection);
-if (error) {
-  std::cerr << "Database could not be opened." << std::endl;
-  return 0;
-}
-//*/
 
 const long Student::errorID = -1;
 const std::string Student::errorLastName = "VOID";
 const std::string Student::errorFirstName = "VOID";
 
 Student::Student() {
+  openConnection();
   this->id = errorID;
   this->lastName = errorLastName;
   this->firstName = errorFirstName;
 }
 
 Student::Student(std::string lastName, std::string firstName) {
+  openConnection();
   if (!exists(lastName, firstName)) {
     this->id = getNextID();
     this->lastName = lastName;
